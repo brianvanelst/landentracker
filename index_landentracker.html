@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1d4ed8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Landen">
+<title>Mijn bezochte landen</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%231d4ed8'/%3E%3Ctext x='90' y='118' font-size='100' text-anchor='middle' fill='white'%3E🌍%3C/text%3E%3C/svg%3E">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f5f5f7;
+    color: #1d1d1f;
+    line-height: 1.5;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); }
+  h1 { font-size: 22px; margin: 0 0 8px; font-weight: 600; }
+  .intro { font-size: 14px; color: #6e6e73; line-height: 1.5; margin: 0 0 16px; }
+  .tip {
+    font-size: 13px;
+    color: #6e6e73;
+    line-height: 1.5;
+    margin: 0 0 16px;
+  }
+  .tip strong { font-weight: 500; color: #1d1d1f; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
+  .stat { background: white; border-radius: 12px; padding: 12px; text-align: center; }
+  .stat-label { font-size: 11px; color: #6e6e73; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 4px; }
+  .stat-val { font-size: 22px; font-weight: 600; }
+
+  .map-wrap { background: white; border-radius: 12px; padding: 12px; margin-bottom: 16px; }
+  #map {
+    width: 100%;
+    height: 380px;
+    border-radius: 8px;
+    background: #f5f5f7;
+  }
+  .leaflet-container { font-family: inherit; }
+  .map-tooltip { font-size: 12px; color: #6e6e73; text-align: center; margin-top: 8px; min-height: 18px; }
+
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar input[type="text"] {
+    flex: 1; min-width: 180px;
+    padding: 10px 14px;
+    border: 1px solid #d2d2d7;
+    border-radius: 10px;
+    font-size: 16px;
+    background: white;
+    font-family: inherit;
+  }
+  .toolbar input[type="text"]:focus { outline: none; border-color: #1d4ed8; }
+  .btn {
+    padding: 10px 14px;
+    border: 1px solid #d2d2d7;
+    background: white;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    color: #1d1d1f;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: #f5f5f7; }
+  .btn:active { transform: scale(0.97); }
+
+  .continent {
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .cont-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .cont-head:active { background: #f5f5f7; }
+  .cont-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .cont-count { font-size: 14px; color: #6e6e73; }
+  .chev { transition: transform 0.2s; }
+  .open .chev { transform: rotate(90deg); }
+
+  .bar { height: 3px; background: #f0f0f3; }
+  .bar-fill { height: 100%; background: #1d4ed8; transition: width 0.3s; }
+
+  .cont-body { display: none; padding: 4px 0 8px; }
+  .open .cont-body { display: block; }
+
+  .country {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border-top: 1px solid #f0f0f3;
+  }
+  .country:active { background: #f5f5f7; }
+  .country input {
+    width: 22px; height: 22px;
+    accent-color: #1d4ed8;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .country-name { font-size: 15px; flex: 1; }
+  .country.visited .country-name { color: #6e6e73; text-decoration: line-through; text-decoration-color: #c7c7cc; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1d1d1f;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 22px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .empty { padding: 12px 16px; color: #86868b; font-size: 14px; }
+
+  @media (max-width: 480px) {
+    .stat-val { font-size: 20px; }
+    h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🌍 Mijn bezochte landen</h1>
+  <p class="intro">De meeste landentrackers tellen alleen de 193 VN-landen. Deze houdt 240 bestemmingen bij: Engeland, Schotland, Wales en Noord-Ierland tellen apart, net als Hongkong, Puerto Rico, Gibraltar, Kosovo, Taiwan en veel andere gebiedsdelen. Voor de fanatieke reiziger die echt álles wil afvinken. 😜</p>
+  <p class="tip"><strong>💡 Tip:</strong> zet deze pagina op je beginscherm zodat hij als app opent. Op iPhone: tik op het deelicoon onderin Safari (vierkant met pijl omhoog) en kies "Zet op beginscherm". Op Android: open het menu (⋮) in Chrome en kies "Toevoegen aan beginscherm".</p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Bezocht</div><div class="stat-val" id="stat-total">0</div></div>
+    <div class="stat"><div class="stat-label">Totaal</div><div class="stat-val" id="stat-max">0</div></div>
+    <div class="stat"><div class="stat-label">Percentage</div><div class="stat-val" id="stat-pct">0%</div></div>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-tooltip" id="map-tip">Sleep om te pannen, scroll of knijp om te zoomen</div>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="🔍 Zoek een land…" />
+    <button class="btn" id="btn-export">⬇️ Export</button>
+    <button class="btn" id="btn-import">⬆️ Import</button>
+    <input type="file" id="file-input" accept="application/json" style="display:none" />
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// === DATA: continenten en landen ===
+const DATA = {
+  "Europa": ["Albanië","Andorra","België","Bosnië en Herzegovina","Bulgarije","Cyprus","Denemarken","Duitsland","Engeland","Estland","Faroër","Finland","Frankrijk","Gibraltar","Griekenland","Guernsey","Hongarije","Ierland","IJsland","Isle of Man","Italië","Jersey","Kosovo","Kroatië","Letland","Liechtenstein","Litouwen","Luxemburg","Malta","Moldavië","Monaco","Montenegro","Nederland","Noord-Ierland","Noord-Macedonië","Noorwegen","Oekraïne","Oostenrijk","Polen","Portugal","Roemenië","Rusland","San Marino","Schotland","Servië","Slovenië","Slowakije","Spanje","Tsjechië","Turkije","Vaticaanstad","Wales","Wit-Rusland","Zweden","Zwitserland"],
+  "Azië": ["Afghanistan","Armenië","Azerbeidzjan","Bahrein","Bangladesh","Bhutan","Brunei","Cambodja","China","Filipijnen","Georgië","Hongkong","India","Indonesië","Irak","Iran","Israël","Japan","Jemen","Jordanië","Kazachstan","Kirgizië","Koeweit","Laos","Libanon","Macau","Maldiven","Maleisië","Mongolië","Myanmar","Nepal","Noord-Korea","Oezbekistan","Oman","Pakistan","Palestina","Qatar","Saoedi-Arabië","Singapore","Sri Lanka","Syrië","Tadzjikistan","Taiwan","Thailand","Timor-Leste","Turkmenistan","Verenigde Arabische Emiraten","Vietnam","Zuid-Korea"],
+  "Afrika": ["Algerije","Angola","Benin","Botswana","Burkina Faso","Burundi","Centraal-Afrikaanse Republiek","Comoren","Democratische Republiek Congo","Djibouti","Egypte","Equatoriaal-Guinea","Eritrea","Eswatini","Ethiopië","Gabon","Gambia","Ghana","Guinee","Guinee-Bissau","Ivoorkust","Kaapverdië","Kameroen","Kenia","Lesotho","Liberia","Libië","Madagaskar","Malawi","Mali","Marokko","Mauritanië","Mauritius","Mayotte","Mozambique","Namibië","Niger","Nigeria","Oeganda","Republiek Congo","Réunion","Rwanda","Sao Tomé en Principe","Senegal","Seychellen","Sierra Leone","Somalië","Soedan","Tanzania","Togo","Tsjaad","Tunesië","Westelijke Sahara","Zambia","Zimbabwe","Zuid-Afrika","Zuid-Soedan"],
+  "Noord-Amerika": ["Anguilla","Bermuda","Canada","Groenland","Saint-Pierre en Miquelon","Verenigde Staten"],
+  "Midden-Amerika": ["Antigua en Barbuda","Aruba","Bahama's","Barbados","Belize","Bonaire","Britse Maagdeneilanden","Cayman Eilanden","Costa Rica","Cuba","Curaçao","Dominica","Dominicaanse Republiek","El Salvador","Grenada","Guadeloupe","Guatemala","Haïti","Honduras","Jamaica","Martinique","Mexico","Montserrat","Nicaragua","Panama","Puerto Rico","Saba","Saint Kitts en Nevis","Saint Lucia","Saint Vincent en de Grenadines","Sint Eustatius","Sint Maarten","Trinidad en Tobago","Turks- en Caicoseilanden","Amerikaanse Maagdeneilanden"],
+  "Zuid-Amerika": ["Argentinië","Bolivia","Brazilië","Chili","Colombia","Ecuador","Falklandeilanden","Frans-Guyana","Guyana","Paraguay","Peru","Suriname","Uruguay","Venezuela"],
+  "Oceanië": ["Amerikaans-Samoa","Australië","Cookeilanden","Fiji","Frans-Polynesië","Guam","Kiribati","Marshalleilanden","Micronesia","Nauru","Nieuw-Caledonië","Nieuw-Zeeland","Niue","Noordelijke Marianen","Palau","Papoea-Nieuw-Guinea","Pitcairneilanden","Salomonseilanden","Samoa","Tonga","Tuvalu","Vanuatu","Wallis en Futuna"],
+  "Antarctica": ["Antarctica"]
+};
+
+// Mapping van ISO alpha-3 codes uit GeoJSON naar onze landennamen.
+// Kaart kleurt alleen in als het "moederland" zelf is aangevinkt.
+// Gebiedsdelen tellen wel mee in totaal/percentage, maar kleuren niet apart op deze kaart.
+const ISO_TO_NAME = {
+  "AFG":"Afghanistan","ALB":"Albanië","DZA":"Algerije","AND":"Andorra","AGO":"Angola",
+  "ARG":"Argentinië","ARM":"Armenië","AUS":"Australië","AUT":"Oostenrijk","AZE":"Azerbeidzjan",
+  "BHS":"Bahama's","BHR":"Bahrein","BGD":"Bangladesh","BRB":"Barbados","BLR":"Wit-Rusland",
+  "BEL":"België","BLZ":"Belize","BEN":"Benin","BTN":"Bhutan","BOL":"Bolivia",
+  "BIH":"Bosnië en Herzegovina","BWA":"Botswana","BRA":"Brazilië","BRN":"Brunei","BGR":"Bulgarije",
+  "BFA":"Burkina Faso","BDI":"Burundi","KHM":"Cambodja","CMR":"Kameroen","CAN":"Canada",
+  "CPV":"Kaapverdië","CAF":"Centraal-Afrikaanse Republiek","TCD":"Tsjaad","CHL":"Chili","CHN":"China",
+  "COL":"Colombia","COM":"Comoren","COG":"Republiek Congo","COD":"Democratische Republiek Congo","CRI":"Costa Rica",
+  "CIV":"Ivoorkust","HRV":"Kroatië","CUB":"Cuba","CYP":"Cyprus","CZE":"Tsjechië",
+  "DNK":"Denemarken","DJI":"Djibouti","DMA":"Dominica","DOM":"Dominicaanse Republiek","ECU":"Ecuador",
+  "EGY":"Egypte","SLV":"El Salvador","GNQ":"Equatoriaal-Guinea","ERI":"Eritrea","EST":"Estland",
+  "SWZ":"Eswatini","ETH":"Ethiopië","FJI":"Fiji","FIN":"Finland","FRA":"Frankrijk",
+  "GAB":"Gabon","GMB":"Gambia","GEO":"Georgië","DEU":"Duitsland","GHA":"Ghana",
+  "GRC":"Griekenland","GRL":"Groenland","GTM":"Guatemala","GIN":"Guinee","GNB":"Guinee-Bissau",
+  "GUY":"Guyana","HTI":"Haïti","HND":"Honduras","HUN":"Hongarije","ISL":"IJsland",
+  "IND":"India","IDN":"Indonesië","IRN":"Iran","IRQ":"Irak","IRL":"Ierland",
+  "ISR":"Israël","ITA":"Italië","JAM":"Jamaica","JPN":"Japan","JOR":"Jordanië",
+  "KAZ":"Kazachstan","KEN":"Kenia","KIR":"Kiribati","PRK":"Noord-Korea","KOR":"Zuid-Korea",
+  "KWT":"Koeweit","KGZ":"Kirgizië","LAO":"Laos","LVA":"Letland","LBN":"Libanon",
+  "LSO":"Lesotho","LBR":"Liberia","LBY":"Libië","LIE":"Liechtenstein","LTU":"Litouwen",
+  "LUX":"Luxemburg","MDG":"Madagaskar","MWI":"Malawi","MYS":"Maleisië","MDV":"Maldiven",
+  "MLI":"Mali","MLT":"Malta","MHL":"Marshalleilanden","MRT":"Mauritanië","MUS":"Mauritius",
+  "MEX":"Mexico","FSM":"Micronesia","MDA":"Moldavië","MCO":"Monaco","MNG":"Mongolië",
+  "MNE":"Montenegro","MAR":"Marokko","MOZ":"Mozambique","MMR":"Myanmar","NAM":"Namibië",
+  "NRU":"Nauru","NPL":"Nepal","NLD":"Nederland","NZL":"Nieuw-Zeeland","NIC":"Nicaragua",
+  "NER":"Niger","NGA":"Nigeria","MKD":"Noord-Macedonië","NOR":"Noorwegen","OMN":"Oman",
+  "PAK":"Pakistan","PLW":"Palau","PSE":"Palestina","PAN":"Panama","PNG":"Papoea-Nieuw-Guinea",
+  "PRY":"Paraguay","PER":"Peru","PHL":"Filipijnen","POL":"Polen","PRT":"Portugal",
+  "QAT":"Qatar","ROU":"Roemenië","RUS":"Rusland","RWA":"Rwanda","KNA":"Saint Kitts en Nevis",
+  "LCA":"Saint Lucia","VCT":"Saint Vincent en de Grenadines","WSM":"Samoa","SMR":"San Marino","STP":"Sao Tomé en Principe",
+  "SAU":"Saoedi-Arabië","SEN":"Senegal","SRB":"Servië","SYC":"Seychellen","SLE":"Sierra Leone",
+  "SGP":"Singapore","SVK":"Slowakije","SVN":"Slovenië","SLB":"Salomonseilanden","SOM":"Somalië",
+  "ZAF":"Zuid-Afrika","SSD":"Zuid-Soedan","ESP":"Spanje","LKA":"Sri Lanka","SDN":"Soedan",
+  "SUR":"Suriname","SWE":"Zweden","CHE":"Zwitserland","SYR":"Syrië","TWN":"Taiwan",
+  "TJK":"Tadzjikistan","TZA":"Tanzania","THA":"Thailand","TLS":"Timor-Leste","TGO":"Togo",
+  "TON":"Tonga","TTO":"Trinidad en Tobago","TUN":"Tunesië","TUR":"Turkije","TKM":"Turkmenistan",
+  "TUV":"Tuvalu","UGA":"Oeganda","UKR":"Oekraïne","ARE":"Verenigde Arabische Emiraten",
+  "GBR":"Engeland", // VK kleurt alleen bij Engeland
+  "USA":"Verenigde Staten","URY":"Uruguay","UZB":"Oezbekistan","VUT":"Vanuatu","VAT":"Vaticaanstad",
+  "VEN":"Venezuela","VNM":"Vietnam","YEM":"Jemen","ZMB":"Zambia","ZWE":"Zimbabwe",
+  "ATA":"Antarctica","ATG":"Antigua en Barbuda","GRD":"Grenada","ESH":"Westelijke Sahara","SAH":"Westelijke Sahara",
+  "XKX":"Kosovo","KOS":"Kosovo","PSX":"Palestina",
+  // Speciale administratieve regio's, gebiedsdelen en eilandgroepen die Natural Earth apart classificeert:
+  "HKG":"Hongkong","MAC":"Macau","TWN":"Taiwan",
+  "PRI":"Puerto Rico","VIR":"Amerikaanse Maagdeneilanden","GUM":"Guam","ASM":"Amerikaans-Samoa","MNP":"Noordelijke Marianen",
+  "BMU":"Bermuda","AIA":"Anguilla","CYM":"Cayman Eilanden","VGB":"Britse Maagdeneilanden","TCA":"Turks- en Caicoseilanden","MSR":"Montserrat",
+  "FRO":"Faroër","GGY":"Guernsey","JEY":"Jersey","IMN":"Isle of Man","GIB":"Gibraltar",
+  "ABW":"Aruba","CUW":"Curaçao","SXM":"Sint Maarten","BES":"Bonaire",
+  "GLP":"Guadeloupe","MTQ":"Martinique","GUF":"Frans-Guyana","REU":"Réunion","MYT":"Mayotte","MAF":"Sint Maarten","BLM":"Saint-Pierre en Miquelon","SPM":"Saint-Pierre en Miquelon",
+  "PYF":"Frans-Polynesië","NCL":"Nieuw-Caledonië","WLF":"Wallis en Futuna",
+  "COK":"Cookeilanden","NIU":"Niue","PCN":"Pitcairneilanden",
+  "FLK":"Falklandeilanden"
+};
+
+// === STATE ===
+const STORAGE_KEY = 'landentracker_v1';
+let visited = new Set();
+try {
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  if (Array.isArray(saved)) visited = new Set(saved);
+} catch(e) {}
+
+const totalCountries = Object.values(DATA).reduce((s,a)=>s+a.length,0);
+const allCountries = new Set(Object.values(DATA).flat());
+
+// === ELEMENTS ===
+const listEl = document.getElementById('list');
+const searchEl = document.getElementById('search');
+const toastEl = document.getElementById('toast');
+const mapEl = document.getElementById('map');
+const mapTipEl = document.getElementById('map-tip');
+const openContinents = new Set();
+
+// === HELPERS ===
+function save(){
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...visited])); } catch(e){}
+}
+function toast(msg){
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(()=>toastEl.classList.remove('show'), 2000);
+}
+function updateStats(){
+  document.getElementById('stat-total').textContent = visited.size;
+  document.getElementById('stat-max').textContent = totalCountries;
+  document.getElementById('stat-pct').textContent = Math.round((visited.size / totalCountries) * 100) + '%';
+}
+function toggleCountry(name){
+  if (visited.has(name)) visited.delete(name);
+  else visited.add(name);
+  save();
+  updateStats();
+  updateMap();
+  renderList();
+}
+
+// === LIJST RENDEREN ===
+function renderList(){
+  const query = searchEl.value.trim().toLowerCase();
+  listEl.innerHTML = '';
+  Object.entries(DATA).forEach(([cont, countries])=>{
+    const filtered = query ? countries.filter(c=>c.toLowerCase().includes(query)) : countries;
+    if (query && filtered.length === 0) return;
+    const visitedCount = countries.filter(c=>visited.has(c)).length;
+    const pct = countries.length ? (visitedCount / countries.length) * 100 : 0;
+    const isOpen = query.length > 0 || openContinents.has(cont);
+    const wrap = document.createElement('div');
+    wrap.className = 'continent' + (isOpen ? ' open' : '');
+    wrap.innerHTML = `
+      <div class="cont-head" data-cont="${cont}">
+        <div class="cont-title"><span class="chev">▶</span>${cont}</div>
+        <div class="cont-count">${visitedCount} / ${countries.length}</div>
+      </div>
+      <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="cont-body">
+        ${filtered.map(c=>{
+          const v = visited.has(c);
+          return `<label class="country ${v?'visited':''}">
+            <input type="checkbox" data-country="${c.replace(/"/g,'&quot;')}" ${v?'checked':''} />
+            <span class="country-name">${c}</span>
+          </label>`;
+        }).join('')}
+      </div>
+    `;
+    listEl.appendChild(wrap);
+  });
+
+  listEl.querySelectorAll('.cont-head').forEach(head=>{
+    head.addEventListener('click', ()=>{
+      const cont = head.getAttribute('data-cont');
+      if (openContinents.has(cont)) openContinents.delete(cont);
+      else openContinents.add(cont);
+      head.parentElement.classList.toggle('open');
+    });
+  });
+
+  listEl.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', ()=>{
+      const name = cb.getAttribute('data-country');
+      if (cb.checked) visited.add(name);
+      else visited.delete(name);
+      save();
+      updateStats();
+      updateMap();
+      // partial DOM update om scroll-positie en open continents te behouden
+      cb.closest('.country').classList.toggle('visited', cb.checked);
+      const contEl = cb.closest('.continent');
+      const cont = contEl.querySelector('.cont-head').getAttribute('data-cont');
+      const countries = DATA[cont];
+      const vCount = countries.filter(c=>visited.has(c)).length;
+      contEl.querySelector('.cont-count').textContent = vCount + ' / ' + countries.length;
+      contEl.querySelector('.bar-fill').style.width = ((vCount/countries.length)*100) + '%';
+    });
+  });
+}
+
+// === LEAFLET KAART ===
+let leafletMap = null;
+let countryLayer = null;
+let geoJsonData = null;
+
+function getCountryCode(feature){
+  // Natural Earth gebruikt ADM0_A3 als betrouwbaarste code (ISO_A3 is soms -99 voor disputed gebieden)
+  const p = feature.properties;
+  return p.ADM0_A3 || p.ISO_A3 || feature.id;
+}
+
+function getCountryDisplayName(feature){
+  const p = feature.properties;
+  return p.ADMIN || p.NAME || 'Onbekend';
+}
+
+function colorFor(feature){
+  const code = getCountryCode(feature);
+  const name = ISO_TO_NAME[code];
+  if (name && visited.has(name)) return '#1d4ed8';
+  return '#e8e8ed';
+}
+
+function styleFor(feature){
+  return {
+    fillColor: colorFor(feature),
+    weight: 0.4,
+    opacity: 1,
+    color: '#a8a8af',
+    fillOpacity: 0.85
+  };
+}
+
+function onEachCountry(feature, layer){
+  const code = getCountryCode(feature);
+  const name = ISO_TO_NAME[code];
+  const displayName = getCountryDisplayName(feature);
+
+  layer.on('click', () => {
+    if (name) {
+      toggleCountry(name);
+      mapTipEl.textContent = (visited.has(name) ? '✓ ' : '✗ ') + name;
+    } else {
+      mapTipEl.textContent = displayName + ' — niet apart geteld in deze lijst';
+    }
+  });
+
+  layer.on('mouseover', () => {
+    if (name) {
+      mapTipEl.textContent = name + (visited.has(name) ? ' (bezocht)' : '');
+    } else {
+      mapTipEl.textContent = displayName + ' — niet apart geteld';
+    }
+    layer.setStyle({ weight: 1.2, color: '#1d1d1f' });
+  });
+
+  layer.on('mouseout', () => {
+    countryLayer.resetStyle(layer);
+  });
+}
+
+function updateMap(){
+  if (countryLayer) {
+    countryLayer.setStyle(styleFor);
+  }
+}
+
+async function loadMap(){
+  // Initialiseer Leaflet kaart
+  leafletMap = L.map('map', {
+    center: [25, 10],
+    zoom: 2,
+    minZoom: 2,
+    maxZoom: 10,
+    worldCopyJump: true,
+    zoomControl: true,
+    attributionControl: true,
+    maxBounds: [[-85, -180], [85, 180]],
+    maxBoundsViscosity: 0.8
+  });
+
+  // Hele wereld in beeld bij laden, ongeacht schermbreedte
+  leafletMap.fitBounds([[-60, -180], [85, 180]]);
+
+  // Aparte pane voor labels, boven de landgrenzen-laag.
+  // Standaard panes in Leaflet: tilePane=200, overlayPane=400, shadowPane=500, markerPane=600, tooltipPane=650.
+  // Wij willen: tegels (200) → landgrenzen (400) → labels (550, eigen pane).
+  leafletMap.createPane('labelsPane');
+  leafletMap.getPane('labelsPane').style.zIndex = 550;
+  leafletMap.getPane('labelsPane').style.pointerEvents = 'none';
+  // CSS-filter om alle labels uniform lichtgrijs te maken
+  leafletMap.getPane('labelsPane').style.filter = 'grayscale(100%) brightness(1.15) contrast(0.85)';
+
+  // Onderlaag: basiskaart zonder tekst
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CartoDB</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(leafletMap);
+
+  // Natural Earth 50m landen-data — bevat Hongkong, Macao, Puerto Rico, Faroer, etc. apart
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson');
+    geoJsonData = await res.json();
+    addCountryLayer();
+  } catch(e) {
+    mapTipEl.textContent = 'Landgrenzen konden niet geladen worden (offline?). Basiskaart en lijst werken nog wel.';
+  }
+
+  // Bovenlaag: alleen tekst, in de gefilterde pane zodat alles uniform grijs wordt
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    pane: 'labelsPane'
+  }).addTo(leafletMap);
+}
+
+function addCountryLayer(){
+  countryLayer = L.geoJSON(geoJsonData, {
+    style: styleFor,
+    onEachFeature: onEachCountry
+  }).addTo(leafletMap);
+}
+
+
+// === EXPORT / IMPORT ===
+document.getElementById('btn-export').addEventListener('click', ()=>{
+  const data = { version: 1, exported: new Date().toISOString(), visited: [...visited].sort() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'landen-bezocht-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup gedownload');
+});
+
+document.getElementById('btn-import').addEventListener('click', ()=>{
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', (e)=>{
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (Array.isArray(data.visited)) {
+        // alleen bekende landen importeren
+        const validImported = data.visited.filter(c => allCountries.has(c));
+        visited = new Set(validImported);
+        save();
+        updateStats();
+        updateMap();
+        renderList();
+        toast('Geïmporteerd: ' + visited.size + ' landen');
+      } else {
+        toast('Ongeldig bestand');
+      }
+    } catch(err) {
+      toast('Kon bestand niet lezen');
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// === ZOEKEN ===
+searchEl.addEventListener('input', renderList);
+
+// === INIT ===
+updateStats();
+renderList();
+loadMap();
+</script>
+</body>
+</html>
